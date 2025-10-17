@@ -1,0 +1,504 @@
+Const MRKikConst_RLay = 836;
+
+Class Mr_uLedgeToken : CustomInventory
+{
+	Default
+	{
+		Inventory.MaxAmount 1;
+		+INVENTORY.UNDROPPABLE
+		+INVENTORY.UNTOSSABLE
+	}
+	bool	LedgeGrabbed, LedgeCheck, Hands[2], middle;
+	float	LedgeAngle, FrameTime;
+	int		LedgeHeight, LedgeHeightR, LedgeTime, LedgeHeightMax, LedgeHeightMin;
+	double	velz;
+	weapon	ReselectWeapon;
+	Vector2 WepOfst;
+		
+	Override Void Tick()
+	{
+		Super.Tick();
+		if(Owner && Owner.Player.ReadyWeapon)
+		{
+			if(Owner.CountInv("MR_Grabbing_A_Ledge")>0 && Hands[1] && Hands[0]){
+			owner.player.SetPsprite(PSP_WEAPON,owner.player.ReadyWeapon.FindState("Select"));
+			owner.player.GetPSprite(PSP_WEAPON).y=WEAPONBOTTOM;
+			if(LedgeGrabbed)LedgeGrab();}
+			else if(Owner.CountInv("MR_Grabbing_A_Ledge")>0){
+					Owner.Player.GetPSprite(PSP_WEAPON).X = Hands[0]? WepOfst.X+50:WepOfst.X-50;
+					Owner.Player.GetPSprite(PSP_WEAPON).Y = WepOfst.Y+30;}
+			if(GetAge()%350==0)Owner.UseInventory(Self);
+		}
+	}
+	
+	void LedgeGrabInitiator()
+	{
+		PlayerInfo ZMPlayer = Owner.player;
+		if(!ZMPlayer){Console.Printf("No Player");Console.Printf(Self.GetClassName());Return;}
+		
+		//Already ledge grabbing, no clipping, moving away from where you are looking, ceiling already too low for sure
+		if(Owner.pos.z <= Owner.floorz || ZMPlayer.Cheats & CF_NOCLIP2 || Owner.CeilingZ <= Owner.Pos.Z + Owner.Height * 1.6f || (Owner.player.cmd.SideMove==0&&Owner.player.Cmd.ForwardMove==0) || LedgeGrabbed ){
+		
+		return; }
+		
+		FLoat Ang;
+		if(abs(DeltaAngle(Owner.Angle, Owner.Angle-90+VectorAngle(Owner.Player.Cmd.SideMove, Owner.Player.Cmd.ForwardMove)))>50)Ang = Owner.Angle;
+		else Ang=Owner.Angle-90+VectorAngle(Owner.Player.Cmd.SideMove, Owner.Player.Cmd.ForwardMove);
+		//============================================
+		//Find ledge (if any)						//
+		//============================================
+		
+		FLineTraceData LedgeTrace[3];
+		bool Hand[2];
+		Hand[0]=Hand[1]=middle=false;
+		Float TraceDistance = sqrt(2) * Owner.Radius + 4; //account for the fact that Doom's hitboxes are square
+		Owner.LineTrace(Ang, TraceDistance, 0, TRF_BLOCKSELF|TRF_THRUACTORS, Owner.Height * 1.2f, 0, 9, data: LedgeTrace[1]);
+		Owner.LineTrace(Ang, TraceDistance, 0, TRF_BLOCKSELF|TRF_THRUACTORS, Owner.Height * 1.2f, 0, -9, data: LedgeTrace[0]);
+		Owner.LineTrace(Ang, TraceDistance, 0, TRF_BLOCKSELF|TRF_THRUACTORS, Owner.Height * 1.2f, 0, 0, data: LedgeTrace[2]);
+		For(int i=0;i<3;i++)
+		{
+			if(i>1 &&(Hand[0]||Hand[1]))Continue;
+			Vector3 HitPos = LedgeTrace[i].HitLocation;
+			if(MRKick_Debug){
+			FSpawnParticleParams Par;
+			Par.Pos = HitPos;
+			Par.Color1 = Color(255,0,0);
+			if(i>0)Par.Color1 = Color(0,255,0);
+			Par.Vel = (0,0,0);
+			Par.Accel = (0,0,0);
+			Par.Flags = 0;
+			Par.Style = STYLE_NORMAL;
+			Par.Lifetime = 1;
+			Par.Size = 2;
+			Par.SizeStep = 0;
+			Par.StartAlpha = 1;
+			Par.FadeStep = 0;
+			Level.SpawnParticle(Par);}
+			
+			Int LedgeCandidate, LedgeCeil;
+			if(LedgeTrace[i].HitType == TRACE_HitWall) //hit wall scenario
+			{
+				if(MRKick_Debug)Console.Printf("Hit the wall");
+				if(LedgeTrace[i].Hit3DFloor != NULL) //3D floor
+				{
+					LedgeCandidate = LedgeTrace[i].Hit3DFloor.Top.ZAtPoint(HitPos.XY);
+				}
+				else //regular wall
+				{
+					Line HitLine = LedgeTrace[i].HitLine;
+					if(HitLine.FrontSector != NULL && HitLine.FrontSector != Owner.CurSector)
+						{LedgeCandidate = HitLine.FrontSector.FloorPlane.ZatPoint(HitPos.XY);
+						LedgeCeil = Hitline.FrontSector.CeilingPlane.ZatPoint(HitPos.XY);}
+					else if(HitLine.BackSector != NULL && HitLine.BackSector != Owner.CurSector)
+						{LedgeCandidate = HitLine.BackSector.FloorPlane.ZatPoint(HitPos.XY);
+						LedgeCeil = Hitline.BackSector.CeilingPlane.ZatPoint(HitPos.XY);}
+				}
+			}
+			else if(LedgeTrace[i].HitSector != Owner.CurSector)//tracer stopper mid air in a sector that is not the one where player currently is
+			{
+				LedgeCandidate = LedgeTrace[i].HitSector.NextLowestFloorAt(HitPos.X, HitPos.Y, HitPos.Z, FFCF_3DRESTRICT, 0);
+				LedgeCeil = LedgeTrace[i].HitSector.NextHighestCeilingAt(HitPos.X, HitPos.Y, HitPos.Z, HitPos.Z, FFCF_3DRESTRICT);
+			}
+			else
+			{
+				Continue;
+			}
+			if(MRKick_Debug)Console.Printf("Got sector");
+			
+			//Check if the candidate ledge can suffice
+			if(i>0 && LedgeCandidate <= Owner.Pos.Z + Owner.Height * 1.2f){LedgeHeightR = LedgeCandidate;}//Hand[1]=True;}
+			
+			if(LedgeCandidate > Owner.Pos.Z + Owner.Height * 0.5 && LedgeCandidate <= Owner.Pos.Z + Owner.Height * 1.2f)
+			{
+				if(!Hand[0]){
+				LedgeAngle = Ang;
+				Vector3 OrigPos = Owner.Pos;
+				Owner.SetXYZ((Pos.XY, LedgeCandidate));
+				if(/*!Owner.CheckMove(Owner.Pos.XY + 5.f * AngleToVector(Owner.Angle)) || */LedgeCeil<LedgeCandidate + Owner.Height || Owner.CeilingZ < LedgeCandidate + Owner.Height) //not enough space, cancel everything :(
+				{
+					if(MRKick_Debug)Console.Printf("Not enough space");
+					Owner.SetXYZ(OrigPos);
+					Continue;
+				}
+				Owner.SetXYZ(OrigPos);
+				
+				LedgeHeight = LedgeCandidate;
+				LedgeHeightMin = (LedgeHeight - Height * 0.97f);
+				LedgeHeightMax = (LedgeHeight - Height * 0.751f);
+				if(MRKick_Debug)Console.Printf("Handy pos");
+				if(MRKick_Debug)Console.Printf("Height: "..LedgeHeight.."  CurHeight: "..Owner.Pos.Z);}
+			}
+			else
+			{
+				continue; //too high/low
+			}
+					
+			LedgeCheck = True;
+			
+			Owner.Vel.Z*=0;
+			GiveInventory("MR_Grabbing_A_Ledge", 1);
+			WepOfst = (Owner.Player.GetPsprite(PSP_WEAPON).X, Owner.Player.GetPSprite(PSP_WEAPON).Y);
+			if(i>1)Middle = true;
+			else Hand[i]=true;
+			
+			if(Owner.pos.z >= (LedgeHeightMin+20))
+			{
+				Owner.A_StopSound(CHAN_WEAPON);
+				//Owner.A_StartSound("ledgeclimb", CHAN_AUTO, pitch:FRandom(.9, 1.1));
+				LedgeCheck = False;
+				LedgeGrabbed = True;
+				//return;
+			}
+		}
+		if(!Middle){
+			if(abs(Owner.Player.Cmd.SideMove)<1000||LedgeHeight>Owner.Pos.Z+Owner.Height*1.2||(!Hand[0]&&Hand[1])||(!Hand[1]&&Hand[0])){Hands[0]=Hand[0];Hands[1]=Hand[1];
+				if(Hand[0]&&Hand[1])owner.player.SetPSprite(PSP_WEAPON,owner.player.ReadyWeapon.FindState("Deselct"));}
+			else if(Owner.Player.Cmd.SideMove>0){Hands[1]=True;Hands[0]=false;}
+			else {Hands[1]=false;Hands[0]=True;}
+			}
+		
+		else {if(Random(0, 9)>4){Hands[1]=1;Hands[0]=0;}else{Hands[1]=0;Hands[0]=1;}}
+	}
+	
+	
+	void LedgeReach()
+	{
+		LedgeTime++;
+		if(LedgeTime >= 30)
+		{
+			//Owner.SetPlayerProperty(0,0,PROP_TOTALLYFROZEN);
+			LedgeGrabbed = LedgeTime = LedgeHeightMin = LedgeHeightMax = FrameTime = 0;
+		}
+	}
+	void LedgeGrab()
+	{
+		if(Owner.Pos.Z >= LedgeHeight||Owner.Vel.Z==0)
+		{
+			//End Ledge Grab
+			
+			//Only if ledge grab was successful
+			//if(LedgeTime >= 35) { return; }
+			LedgeCheck = LedgeGrabbed = LedgeTime = LedgeHeightMin = LedgeHeightMax = FrameTime = 0;
+			Owner.Vel = (5.f * AngleToVector(LedgeAngle), -1); //push player forward and downward
+			//Owner.A_PlaySound("*land", CHAN_BODY);
+		}
+		else
+		{
+			Owner.Vel = (0,0,4);
+		}
+	}
+	
+	action void ActLedgeReach(float HeightDecrease)
+	{
+		invoker.LedgeHeightMax = (invoker.LedgeHeight - Height * HeightDecrease * 1.0f);
+		A_Stop();
+		if(Pos.Z<invoker.LedgeHeightMax)SetOrigin((Pos.X, Pos.Y, invoker.LedgeHeightMax), True);
+	}
+	
+	States
+	{
+	Use:
+		TNT1 A 1 A_OverLay(835, "Waiting", true);
+		Fail;
+	Pickup:TNT1 A 0{return true;}Stop;
+		
+		Waiting:
+			TNT1 A 0 A_JumpIfInventory("MR_Grabbing_A_Ledge", 1, "LedgeClimb");
+			//TNT1 A 0 A_Log("Grabin");
+			TNT1 A 1 {
+						if(!GetCvar("MR_UKickLedge"))Return;
+						if(invoker.LedgeCheck)
+						{
+							if(invoker.LedgeTime >= 30)SetPlayerProperty(0,0,PROP_FROZEN);
+							invoker.LedgeReach();
+						}
+						if(invoker.LedgeGrabbed)
+						{
+							invoker.LedgeGrab();
+						}
+						invoker.LedgeGrabInitiator();
+				}
+			Loop;
+		
+		
+		LedgeClimb:
+			CL4M A 0 {if(invoker.Hands[0]&&invoker.Hands[1]&&!invoker.Middle)A_Overlay(MRKikConst_RLay, "LedgeClimbR");}
+			CL1M A 0 A_JumpIf(invoker.Hands[0] && GetCVar("MR_UKickVanila")<0, 5);
+			CL2M A 0 A_JumpIf(invoker.Hands[0] && GetCVar("MR_UKickVanila")<1, 4);
+			CL5M A 0 A_JumpIf(invoker.Hands[0] && GetCVar("MR_UKickVanila")<2, 3);
+			CL7M A 0 A_JumpIf(invoker.Hands[0], 2);
+			TNT1 A 0 A_Overlay(MRKikConst_RLay, "LedgeClimbR", True);
+			
+			#### A 0 A_Stop();
+			#### A 0 SetPlayerProperty(0,1,PROP_FROZEN);
+			#### A 0 A_StartSound("ledgeclimb", CHAN_AUTO, pitch:FRandom(.8, 1.2));
+			#### B 1{
+				int Ofst = 0;
+				if(invoker.Middle){Ofst = 70;if(invoker.Hands[1])Ofst =-Ofst;}
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (DeltaAngle(Angle, invoker.LedgeAngle)-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (DeltaAngle(Angle, invoker.LedgeAngle)-50));
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2-40, 70, WOF_INTERPOLATE);
+				A_OverlayOffset(MRKikConst_RLay, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2+40, 70, WOF_INTERPOLATE);
+				A_OverlayPivotAlign(835, PSPA_CENTER, PSPA_TOP);A_OverlayPivotAlign(MRKikConst_RLay, PSPA_CENTER, PSPA_TOP);
+				A_OverlayScale(835, 1.2, 1.2);
+				A_OverlayScale(MRKikConst_RLay, 1.2, 1.2);
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(invoker.LedgeAngle + 45);
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(invoker.LedgeAngle - 45);
+				if(Pos.Z < (invoker.LedgeHeight - Height * 0.78f))
+				{
+					Vel = Vel.Length() ? (0, 0, invoker.velz) : (0, 0, 0);
+				}
+				else if(Pos.Z < (invoker.LedgeHeight - Height * 0.76f))
+				{
+					ActLedgeReach(0.751);
+
+					return ResolveState("LedgeReach");
+					
+				}
+				return ResolveState(null);}
+			#### B 1{
+				int Ofst = 0;
+				if(invoker.Middle){Ofst = 70;if(invoker.Hands[1])Ofst =-Ofst;}
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (DeltaAngle(Angle, invoker.LedgeAngle)-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (DeltaAngle(Angle, invoker.LedgeAngle)-50));
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2-20, 50, WOF_INTERPOLATE);
+				A_OverlayOffset(MRKikConst_RLay, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2+20, 50, WOF_INTERPOLATE);
+				A_OverlayScale(835, 1.1, 1.1, WOF_INTERPOLATE);
+				A_OverlayScale(MRKikConst_RLay, 1.1, 1.1, WOF_INTERPOLATE);
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(invoker.LedgeAngle + 45);
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(invoker.LedgeAngle - 45);
+				if(Pos.Z < (invoker.LedgeHeight - Height * 0.78f))
+				{
+					Vel = Vel.Length() ? (0, 0, invoker.velz) : (0, 0, 0);
+				}
+				else if(Pos.Z < (invoker.LedgeHeight - Height * 0.76f))
+				{
+					ActLedgeReach(0.751);
+
+					return ResolveState("LedgeReach");
+					
+				}
+				return ResolveState(null);}	
+			#### B 1 {
+				int Ofst = 0;
+				if(invoker.Middle){Ofst = 70;if(invoker.Hands[1])Ofst =-Ofst;}
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (DeltaAngle(Angle, invoker.LedgeAngle)-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (DeltaAngle(Angle, invoker.LedgeAngle)-50));
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 60+Max(-90,- (invoker.LedgeHeight-Player.ViewZ)*5-Pitch * 3), WOF_INTERPOLATE);
+				A_OverlayOffset(MRKikConst_RLay, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 60+Max(-90,- (invoker.LedgeHeightR-Player.ViewZ)*5-Pitch * 3), WOF_INTERPOLATE);
+				A_OverlayScale(835, .94, .94);
+				A_OverlayScale(MRKikConst_RLay, .94, .94);
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(invoker.LedgeAngle + 45);
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(invoker.LedgeAngle - 45);
+				if(Pos.Z < (invoker.LedgeHeight - Height * 0.78f))
+				{
+					Vel = Vel.Length() ? (0, 0, invoker.velz) : (0, 0, 0);
+				}
+				else if(Pos.Z < (invoker.LedgeHeight - Height * 0.76f))
+				{
+					ActLedgeReach(0.751);
+
+					return ResolveState("LedgeReach");
+					
+				}
+				return ResolveState(null);
+			}
+		LedgeReach:
+			#### B 1 {
+				if(Pos.Z >= (invoker.LedgeHeight - Height * 0.78f))
+				{
+				int Ofst = 0;
+				if(invoker.Middle)Ofst = 70;
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+					A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 50+Max(-90,- (invoker.LedgeHeight-(Player.ViewZ+5))*5-Pitch * 3), WOF_INTERPOLATE);
+					A_OverlayOffset(MRKikConst_RLay, -Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 50+Max(-90,- (invoker.LedgeHeightR-(Player.ViewZ+5))*5-Pitch * 3), WOF_INTERPOLATE);
+					A_OverlayScale(835, 1-.03, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002)-.03, WOF_INTERPOLATE);
+					A_OverlayScale(MRKikConst_RLay, 1-.03, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002)-.03, WOF_INTERPOLATE);
+					if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+					GiveInventory("MR_Grabbing_A_Ledge", 1);
+					ActLedgeReach(0.751);
+				}
+				else if(Pos.Z < (invoker.LedgeHeight - Height * 0.78f))Vel = Vel.Length() ? (0, 0, invoker.velz) : (0, 0, 0);
+			}
+			#### A 0 A_JumpIf(CountInv("MR_Grabbing_A_Ledge")==1, 1);
+			Loop;
+			#### E 1 {
+				int Ofst = 0;
+				if(invoker.Middle)Ofst = 70;
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				Float Scal = abs(DeltaAngle(Angle, invoker.LedgeAngle));
+				Scal *=.003;
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeight-Player.ViewZ)*9-Pitch * 3));
+				A_OverlayOffset(MRKikConst_RLay, -Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeightR-Player.ViewZ)*9-Pitch * 3));
+				A_OverlayScale(835, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				A_OverlayScale(MRKikConst_RLay, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				ActLedgeReach(0.751);
+				A_StopSound(CHAN_WEAPON);
+				invoker.LedgeCheck = False;
+				invoker.LedgeGrabbed = True;
+			}
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedge");
+			#### F 1 {
+				int Ofst = 0;
+				if(invoker.Middle)Ofst = 70;
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeight-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				A_OverlayOffset(MRKikConst_RLay, -Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeightR-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				Float Scal = abs(DeltaAngle(Angle, invoker.LedgeAngle));
+				Scal *=.003;
+				A_OverlayScale(835, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				A_OverlayScale(MRKikConst_RLay, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				if(!invoker.Hands[0]||!invoker.Hands[1])Vel = (0, 0, -2);
+			}
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedge");
+			#### G 1 {
+				int Ofst = 0;
+				if(invoker.Middle)Ofst = 70;
+				//Console.Printf("Mid "..Ofst.." HeighL "..invoker.LedgeHeight.." HeightR "..invoker.LedgeHeightR.." ViewZ "..Player.ViewZ);
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeight-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				A_OverlayOffset(MRKikConst_RLay, -Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeightR-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				Float Scal = abs(DeltaAngle(Angle, invoker.LedgeAngle));
+				Scal *=.003;
+				A_OverlayScale(835, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				A_OverlayScale(MRKikConst_RLay, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				if(!invoker.Hands[0]||!invoker.Hands[1])Vel = (0, 0, -1);
+			}
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedge");
+			#### G 1 {
+				int Ofst = 0;
+				if(invoker.Middle)Ofst = 70;
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeight-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				A_OverlayOffset(MRKikConst_RLay, -Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeightR-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				Float Scal = abs(DeltaAngle(Angle, invoker.LedgeAngle));
+				Scal *=.003;
+				A_OverlayScale(835, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				A_OverlayScale(MRKikConst_RLay, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				if(!invoker.Hands[0]||!invoker.Hands[1])Vel = (0,0,0);
+			}
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedge");
+			#### G 1 {
+				int Ofst = 0;
+				if(invoker.Middle)Ofst = 70;
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90, -(invoker.LedgeHeight-Player.ViewZ)*9 -Pitch * 3), WOF_INTERPOLATE);
+				A_OverlayOffset(MRKikConst_RLay, -Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90, -(invoker.LedgeHeightR-Player.ViewZ)*9 -Pitch*3), WOF_INTERPOLATE);
+				Float Scal = abs(DeltaAngle(Angle, invoker.LedgeAngle));
+				Scal *=.003;
+				A_OverlayScale(835, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				A_OverlayScale(MRKikConst_RLay, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				if(!invoker.Hands[0]||!invoker.Hands[1])Vel = (0,0,5);
+			}
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedge");
+		FinishClimb:
+			#### G 1 {
+				int Ofst = 0;
+				if(invoker.Middle)Ofst = 70;
+				if(DeltaAngle(Angle, invoker.LedgeAngle)>50)A_SetAngle(Angle + (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				else if(DeltaAngle(Angle, invoker.LedgeAngle)<-50)A_SetAngle(Angle - (abs(DeltaAngle(Angle, invoker.LedgeAngle))-50));
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeight-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				A_OverlayOffset(MRKikConst_RLay, -Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-90,- (invoker.LedgeHeightR-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				Float Scal = abs(DeltaAngle(Angle, invoker.LedgeAngle));
+				Scal *=.003;
+				A_OverlayScale(835, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				A_OverlayScale(MRKikConst_RLay, 1-Scal, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002), WOF_INTERPOLATE);
+				vel.z = 3.6;
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				//if(!invoker.Hands[0]||!invoker.Hands[1])Vel = (0, 0, 0);
+			}
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedge");
+			Loop;
+		ReleaseLedge:
+			#### B 1 {
+				int Ofst = 0;
+				if(invoker.Middle)Ofst = 70;
+				A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-80, -(invoker.LedgeHeight-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				A_OverlayOffset(MRKikConst_RLay, -Ofst - DeltaAngle(Angle, invoker.LedgeAngle)*2, 30+Max(-80,- (invoker.LedgeHeightR-Player.ViewZ)*9-Pitch * 3), WOF_INTERPOLATE);
+				A_OverlayScale(835, 1.1, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002)+.1, WOF_INTERPOLATE);
+				A_OverlayScale(MRKikConst_RLay, 1.1, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002)+.1, WOF_INTERPOLATE);
+				invoker.velz = 3.6;
+				if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+				if(!invoker.Hands[0]||!invoker.Hands[1])Vel = Vel.Length() ? (0, 0, invoker.velz) : (0, 0, 0);
+			}
+			#### BB 1 {
+					if(Pitch>40 || Pitch<-50)A_SetPitch(Pitch-Pitch/2, SPF_INTERPOLATE);
+					int Ofst = 0;
+					if(invoker.Middle)Ofst = 70;
+					A_OverlayScale(835, 1.2, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002)+.2, WOF_INTERPOLATE);
+					A_OverlayScale(MRKikConst_RLay, 1.2, Min(1.2, 1+(invoker.LedgeHeight-Player.ViewZ)*9*.002)+.2, WOF_INTERPOLATE);
+					A_OverlayOffset(835, Ofst - DeltaAngle(Angle, invoker.LedgeAngle), 30+Max(-85, -(invoker.LedgeHeight-Player.ViewZ)*12-Pitch * 3), WOF_INTERPOLATE);
+					A_OverlayOffset(MRKikConst_RLay, -Ofst - DeltaAngle(Angle, invoker.LedgeAngle), 30+Max(-85, -(invoker.LedgeHeightR-Player.ViewZ)*12-Pitch * 3), WOF_INTERPOLATE);}
+			TNT1 AA 1 {
+				A_SetPitch(pitch-pitch/2, SPF_INTERPOLATE);
+				A_WeaponReady(WRF_NOSWITCH);
+			}
+			TNT1 A 0 SetPlayerProperty(0,0,PROP_FROZEN);
+			TNT1 A 0 TakeInventory("MR_Grabbing_A_Ledge", 1);
+			Goto Waiting;
+		
+		
+		
+		LedgeClimbR:
+			CL4M A 0 A_JumpIf(invoker.Hands[0] && GetCVar("MR_UKickVanila")<0, 4);
+			CL3M A 0 A_JumpIf(GetCVar("MR_UKickVanila")<1, 3);
+			CL6M A 0 A_JumpIf(GetCVar("MR_UKickVanila")<2, 2);
+			CL8M A 0;
+			#### B 1{
+				if(!(Pos.Z < (invoker.LedgeHeight - Height * 0.78f)) && Pos.Z < (invoker.LedgeHeight - Height * 0.76f))
+				{
+					return ResolveState("LedgeReachR");
+				}
+				return ResolveState(null);}
+			#### B 1{
+				if(!(Pos.Z < (invoker.LedgeHeight - Height * 0.78f))&&Pos.Z < (invoker.LedgeHeight - Height * 0.76f))
+				{
+					return ResolveState("LedgeReachR");
+				}
+				return ResolveState(null);}	
+			#### B 1 {
+				if(!(Pos.Z < (invoker.LedgeHeight - Height * 0.78f))&&Pos.Z < (invoker.LedgeHeight - Height * 0.76f))
+				{
+					return ResolveState("LedgeReachR");
+				}
+				return ResolveState(null);
+			}
+		LedgeReachR:
+			#### B 1;
+			#### A 0 A_JumpIf(CountInv("MR_Grabbing_A_Ledge")==1, 1);
+			Loop;
+			#### E 1;
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedgeR");
+			#### F 1;
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedgeR");
+			#### G 1;
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedgeR");
+			#### G 1;
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedgeR");
+			#### G 1;
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedgeR");
+		FinishClimbR:
+			#### G 1;
+			#### # 0 A_JumpIf(Pos.Z>invoker.LedgeHeight-Height*.4||!invoker.LedgeGrabbed, "ReleaseLedgeR");
+			Loop;
+		ReleaseLedgeR:
+			#### BBB 1;
+			Stop;
+	}
+}
+
+Class MR_Grabbing_A_Ledge : Inventory{default{inventory.MaxAmount 1;}}

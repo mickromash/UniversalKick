@@ -1,0 +1,51 @@
+Version "3.0"
+
+Class MR_uKickHandler : EventHandler
+{
+	override void NetworkProcess(ConsoleEvent e)
+	{
+		Let Plr = Players[e.Player].mo;
+		if(!Plr)Return;
+		if(Plr.Health<1)Return;
+		
+		if(e.name ~== "MR_uKick"){
+			if(!Plr.CountInv("MR_uKickToken"))Plr.A_GiveInventory("MR_uKickToken");
+			Plr.UseInventory(Plr.FindInventory("MR_uKickToken"));
+		}
+		
+		if(e.name ~== "MR_uKickGive"){
+			if(!Plr.CountInv("Mr_uLedgeToken"))Plr.A_GiveInventory("Mr_uLedgeToken");
+			if(!Plr.CountInv("MR_uLegsToken"))Plr.A_GiveInventory("MR_uLegsToken");
+			if(!Plr.CountInv("MR_uKickToken"))Plr.A_GiveInventory("MR_uKickToken");
+			if(!Plr.CountInv("MR_FukToken"))Plr.A_GiveInventory("MR_FukToken");
+			
+			Console.Printf(StringTable.Localize("$MRUKICK_INSTALLED"));
+		}
+	}
+	
+	Override Void WorldUnloaded(WorldEvent e)
+	{
+		for (int i = 0; i < MAXPLAYERS; i++)
+		{
+			if(PlayerPawn(players[i].mo)){PlayerPawn(Players[i].mo).A_TakeInventory("MR_uKickToken");}
+		}
+	}
+	
+	override void PlayerEntered(PlayerEvent e)
+	{
+		Let Plr = players[e.PlayerNumber].mo;
+		
+		Plr.A_GiveInventory("MR_uKickToken");
+		Plr.A_GiveInventory("MR_uLegsToken");
+		Plr.A_GiveInventory("Mr_uLedgeToken");
+		Plr.A_GiveInventory("MR_FukToken");
+		Plr.Roll = 0;
+	}
+}
+
+#include "ZScript/MR_UKick/KickBase.zsc"
+#include "ZScript/MR_UKick/Legs.zsc"
+
+#include "ZScript/MR_UKick/LedgeBase.zsc"
+
+#include "ZScript/MR_UKick/Fuk.zsc"

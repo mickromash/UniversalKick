@@ -1,0 +1,57 @@
+[en eng enu default]
+
+MRUKICKKEYS = "Universal Kick";
+MRUKICKKEY = "Kick";
+MR_UKICKACTIVE = "Kick activates switches";
+MRUKICKFUKKEY = "Taunt";
+MR_UKICKFPSLEGSOPT = "Show first person legs";
+MR_UKICKLEDGE = "Ledge climbing";
+
+MR_UKICKSPRITES = "Gloves";
+MR_UKICKBRUTAL = "\cmBrut\coal";
+MR_UKICKBLACK = "\cmBlack";
+MR_UKICKBROWN = "\coVanilla";
+MR_UKICK2016 = "\cqDOOM (2016)";
+
+MR_UKICKSLIDEPARTS = "Particles on sliding";
+MR_UKICKSLIDEPARTS1 = "Dust";
+MR_UKICKSLIDEPARTS2 = "Dirt";
+MR_UKICKSLIDEPARTS3 = "Dust and dirt";
+
+MR_UKICKFUKVOICE = "Taunt voice";
+MR_UKICKFUKVOICETIP = "If taunts won't play with your HDest skin, try turning off option below";
+MR_UKICKFUKVOICETIP2 = "and tipping its Sound Class in \"Taunt voice\" setting";
+MR_UKICKFUKVOICETIP3 = "Default taunt voice: BrutalDefault";
+MR_UKICKFUCKUSEHD = "Use Hideous Destructor Voice";
+
+MRUKICK_INSTALLED = "U-Kick plugins installed";
+
+MR_uKickGive = "Some part of the mod doesn't work";
+
+[ru rus]
+
+MRUKICKKEYS = "Универсальный пинок";
+MRUKICKKEY = "Пнуть";
+MR_UKICKACTIVE = "Пинок активирует кнопки";
+MRUKICKFUKKEY = "Показать фак";
+MR_UKICKFPSLEGSOPT = "Показывать ноги от первого лица";
+MR_UKICKLEDGE = "Хвататься за уступы";
+MR_UKICKSPRITES = "Перчатки";
+MR_UKICKBRUTAL = "\cmБруталь\coные";
+MR_UKICKBLACK = "\cmЧёрные";
+MR_UKICKBROWN = "\coКлассические";
+
+MR_UKICKSLIDEPARTS = "Частицы во время подката";
+MR_UKICKSLIDEPARTS1 = "Облака пыли";
+MR_UKICKSLIDEPARTS2 = "Грязь";
+MR_UKICKSLIDEPARTS3 = "Пыль и грязь";
+
+MR_UKICKFUKVOICE = "Голос оскорбления";
+MR_UKICKFUKVOICETIP = "Если оскорбления не работают с вашим HDest скином, попробуйте выключить";
+MR_UKICKFUKVOICETIP2 = "опцию ниже и ввести его Голос в строке \"Голос оскорбления\"";
+MR_UKICKFUKVOICETIP3 = "Голос по умолчанию: BrutalDefault";
+MR_UKICKFUCKUSEHD = "Использовать голос из Hideous Destructor";
+
+MRUKICK_INSTALLED = "Функции мода установлены";
+
+MR_uKickGive = "Если что-то не работает";

@@ -1,0 +1,34 @@
+MrKickSwing1 "Sounds/F1STWH1.ogg"
+MrKickSwing2 "Sounds/F1STWH2.ogg"
+$Random MrKickSwing { MrKickSwing1 MrKickSwing2 }
+
+MrKickHitWall "Sounds/FOOTWALL"
+$Volume MrKickHitWall .5
+
+MrSlideKick1 "Sounds/SLIDSTR1.ogg"
+MrSlideKick2 "Sounds/SLIDSTR2.ogg"
+MrSlideKick3 "Sounds/SLIDSTR3.ogg"
+$Random MrSlideKick { MrSlideKick1 MrSlideKick2 MrSlideKick3 }
+
+MrSlideLoop1 "Sounds/SLIDLOP1.ogg"
+MrSlideLoop3 "Sounds/SLIDLOP3.ogg"
+MrSlideLoop4 "Sounds/SLIDLOP4.ogg"
+$Random MrSlideLoop { MrSlideLoop1 MrSlideLoop3 MrSlideLoop4 }
+
+MrSlideEnd "Sounds/SLIDEND1.ogg"
+
+MrKickPunch1 "Sounds/plspnch1.ogg"
+MrKickPunch2 "Sounds/plspnch2.ogg"
+MrKickPunch3 "Sounds/plspnch3.ogg"
+MrKickPunch4 "Sounds/plspnch4.ogg"
+MrKickPunch5 "Sounds/plspnch5.ogg"
+MrKickPunch6 "Sounds/plspnch6.ogg"
+$Random MrKickPunch { MrKickPunch1 MrKickPunch2 MrKickPunch3 MrKickPunch4 MrKickPunch5 MrKickPunch6 }
+
+ledgeclimb CLIMB_1
+
+MR_Taunt/Default/Fuk1 "Sounds/MR_Taunts/Default/FUCK1.ogg"
+MR_Taunt/Default/Fuk2 "Sounds/MR_Taunts/Default/FUCK2.ogg"
+MR_Taunt/Default/Fuk3 "Sounds/MR_Taunts/Default/FUCK3.ogg"
+MR_Taunt/Default/Fuk4 "Sounds/MR_Taunts/Default/FUCK4.ogg"
+$Random Player/BrutalDefault/Taunt { MR_Taunt/Default/Fuk1 MR_Taunt/Default/Fuk2 MR_Taunt/Default/Fuk3 MR_Taunt/Default/Fuk4 }

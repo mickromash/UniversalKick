@@ -1,0 +1,42 @@
+AddOptionMenu "OptionsMenu"
+{
+	StaticText ""
+	SubMenu "$MRUKICKKEYS", "MR_UKickOptions"
+}
+
+OptionValue "MRKickSprites"
+{
+	0, "$MR_UKICKBRUTAL"
+	-1, "$MR_UKICKBLACK"
+	1, "$MR_UKICKBROWN"
+	2, "$MR_UKICK2016"
+}
+
+OptionMenu "MR_UKickOptions"
+{
+	Title "$MRUKICKKEYS"
+	Control "$MRUKICKKEY", mr_kick
+	Control "$MRUKICKFUKKEY", mr_fuk
+	StaticText ""
+	Option "$MR_UKICKACTIVE", "MR_UKickUse", "YesNo"
+	Option "$MR_UKICKSLIDEPARTS", "MR_UKickSlide", "MR_UKickSlideValue"
+	Option "$MR_UKICKFPSLEGSOPT", "MR_UKickFPLegs", "YesNo"
+	Option "$MR_UKICKLEDGE", "MR_UKickLedge", "YesNo"
+	Option "$MR_UKICKSPRITES", "MR_UKickVanila", "MRKickSprites"
+	StaticText ""
+	TextField  "$MR_UKICKFUKVOICE", "MR_UKickVoice"
+	StaticText "$MR_UKICKFUKVOICETIP", "Fire"
+	StaticText "$MR_UKICKFUKVOICETIP2", "Fire"
+	StaticText "$MR_UKICKFUKVOICETIP3", "Fire"
+	Option "$MR_UKICKFUCKUSEHD", "MR_UKickHDestVoice", "YesNo"
+	StaticText ""
+	Command "$MR_uKickGive", "Netevent MR_uKickGive"
+}
+
+OptionValue "MR_UKickSlideValue"
+{
+	0, "$OPTVAL_OFF"
+	1, "$MR_UKICKSLIDEPARTS1"
+	2, "$MR_UKICKSLIDEPARTS2"
+	3, "$MR_UKICKSLIDEPARTS3"
+}

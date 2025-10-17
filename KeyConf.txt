@@ -1,0 +1,6 @@
+addkeysection "$MRUKICKKEYS" mrukickks
+addmenukey "$MRUKICKKEY" mr_kick
+addmenukey "$MRUKICKFUKKEY" mr_fuk
+
+alias mr_kick "NetEvent MR_uKick"
+alias mr_fuk "Use MR_FukToken"

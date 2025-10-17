@@ -1,0 +1,550 @@
+Class MR_uKickToken : CustomInventory
+{
+	Float PosZ;
+	Int Falling;
+	action Actor A_FireProjectileLZDoom(class<Actor> missiletype, double angle = 0, double spawnofs_xy = 0, double spawnheight = 0, int flags = 0, double pitch = 0)
+	{
+		let player = self.player;
+		if (!player) return null;
+
+		let weapon = player.ReadyWeapon;
+
+		FTranslatedLineTarget t;
+
+		if (missiletype)
+		{
+			double ang = self.Angle - 90;
+			Vector2 ofs = AngleToVector(ang, spawnofs_xy);
+			double shootangle = self.Angle;
+
+			if (flags & FPF_AIMATANGLE) shootangle += angle;
+
+			// Temporarily adjusts the pitch
+			double saved_player_pitch = self.Pitch;
+			self.Pitch += pitch;
+
+			Actor misl, realmisl;
+			[misl, realmisl] = SpawnPlayerMissile(missiletype, shootangle, ofs.X, ofs.Y, spawnheight, t, false, (flags & FPF_NOAUTOAIM) != 0);
+			self.Pitch = saved_player_pitch;
+
+			if (realmisl && flags & FPF_TRANSFERTRANSLATION)
+				realmisl.Translation = Translation;
+
+			return realmisl;
+		}
+		return null;
+	}
+	
+	bool KickHasHitObject, Kickin, LeftKick;
+	double PlrZpos, SlideAng;
+	Vector2 WeapOfst, Ofst;
+	Default
+	{
+		Inventory.MaxAmount 1;
+		+INVENTORY.UNDROPPABLE
+		+INVENTORY.UNTOSSABLE
+	}
+	
+	Override Void DoEffect()
+	{
+		if(Kickin && Ofst.X <= 25)
+		{
+			TextureId Sprit;
+			if(Owner.Player.GetPSprite(PSP_WEAPON).CurState)
+				Sprit = Owner.Player.GetPSprite(PSP_WEAPON).CurState.GetSpriteTexture(0);
+				
+			Vector2 Size = (1,1);
+			Size = Texman.GetScaledSize(Sprit);
+			
+			if(Size.X<=1 && Owner.Player.GetPSprite(PSP_FLASH).CurState){
+				Sprit = Owner.Player.GetPSprite(PSP_FLASH).CurState.GetSpriteTexture(0);
+				Size = Texman.GetScaledSize(Sprit);
+			}
+			
+			if(Sprit.IsValid()){
+				Owner.Player.GetPSprite(PSP_WEAPON).X = WeapOfst.X+Ofst.X*(LeftKick?1.5:-1.5);
+				Owner.Player.GetPSprite(PSP_WEAPON).Y = WeapOfst.Y+Ofst.Y*1.25;
+				Owner.Player.GetPSprite(PSP_WEAPON).Pivot = (.5, 0);
+				Owner.Player.GetPSprite(PSP_WEAPON).Rotation = -Owner.Player.GetPSprite(PSP_WEAPON).X*.3;
+			}
+			
+			if(Ofst.X < 25)Ofst += (Min(7, 25 - Ofst.X), min(8, 29 - Ofst.Y));
+		}
+		else if(!Kickin && Ofst != (0, 0))
+		{
+			Owner.Player.GetPSprite(PSP_WEAPON).X = WeapOfst.X+Ofst.X*(LeftKick?1.5:-1.5);
+			Owner.Player.GetPSprite(PSP_WEAPON).Y = WeapOfst.Y+Ofst.Y*1.25;
+			Owner.Player.GetPSprite(PSP_WEAPON).Pivot = (.5, 0);
+			Owner.Player.GetPSprite(PSP_WEAPON).Rotation = -Owner.Player.GetPSprite(PSP_WEAPON).X*.3;
+			
+			Ofst -= (4, 8);
+			
+			if(Ofst.X < 1 || Ofst.Y < 1){Ofst = (0, 0);Owner.Player.GetPSprite(PSP_WEAPON).Rotation=0;LeftKick=False;}
+		}
+	}
+	
+	Void MRKick_GetWeapOfst()
+	{
+		if(Ofst!=(0, 0))
+		{
+			Ofst = (0, 0);
+			Owner.Player.GetPSprite(PSP_WEAPON).X = WeapOfst.X;
+			Owner.Player.GetPSprite(PSP_WEAPON).Y = WeapOfst.Y;
+			LeftKick = false;
+		}
+		WeapOfst = (Owner.Player.GetPSprite(PSP_WEAPON).X, Owner.Player.GetPSprite(PSP_WEAPON).Y);
+		Kickin = True;
+	}
+		
+	States
+	{
+	Use:
+		TNT1 A 0 {A_OverLay(-853,"Kicking", true);Invoker.KickHasHitObject=false;A_StopSound(4);}
+		Fail;
+	Pickup:
+		TNT1 A 0
+		{
+			return true;
+		}
+		Stop;
+			
+	Kicking:
+		#### # 0 {A_TakeInventory("MR_UKNoLegs", 2);A_GiveInventory("MR_UKNoLegs",1);}
+		TNT1 A 0 {
+			A_OverlayOffset(-853, 0, 32);A_OverlayScale(-853, 1, 0);
+			A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, true);
+		}
+		NULL A 0 A_JumpIf(Vel.XY.Length()>1 && (Height < MR_uLegsToken(FindInventory("MR_uLegsToken")).MaxHeight * .9||Player.cmd.buttons&BT_CROUCH), "SlideKick");
+		NULL A 0 A_JumpIf (vel.Z != 0||pos.z>floorz, "AirKick");
+		KIC2 A 1 {
+			if(MR_uLegsToken(FindInventory("MR_uLegsToken")).PlrAngle-Angle < 0){A_OverlayScale(-853, -1, 1);invoker.LeftKick=True;}
+			A_StartSound("MrKickSwing", CHAN_Auto, pitch: frandom(.96, 1.1));
+			SetPlayerProperty(0,1,0);
+			A_SetAngle(-0.5 + angle, SPF_INTERPOLATE);
+			A_SetPitch(+0.5 + pitch, SPF_INTERPOLATE);
+			A_SetRoll(roll-2);
+			player.fov = player.desiredfov * 0.98;
+			invoker.MRKick_GetWeapOfst();
+			}
+		NULL A 0 {If(vel.Z != 0||pos.z>floorz){ 
+			SetPlayerProperty(0,0,0);
+			A_SetAngle(+0.5 + angle, SPF_INTERPOLATE);
+			A_SetPitch(-0.5 + pitch, SPF_INTERPOLATE);
+			A_SetRoll(roll+2);
+			player.fov = player.desiredfov;
+			A_OverLay(-853, "AirKick");
+			}}
+		KIC2 B 1 {
+			A_SetAngle(-0.5 + angle, SPF_INTERPOLATE);
+			A_SetPitch(+0.5 + pitch, SPF_INTERPOLATE);
+			A_SetRoll(roll-2);
+			player.fov = player.desiredfov * 0.970;
+			}
+		KIC2 C 1 {
+			A_SetAngle(-0.5 + angle, SPF_INTERPOLATE);
+			A_SetPitch(+0.5 + pitch, SPF_INTERPOLATE);
+			A_SetRoll(roll-2);
+			player.fov = player.desiredfov * 0.965;
+		}
+		KIC2 D 1 { 
+			A_SetPitch(+1.25 + pitch, SPF_INTERPOLATE);
+			player.fov = player.desiredfov * 0.950;
+			}
+        KIC2 E 1 A_Recoil(-1);
+        KIC2 F 1 {
+				A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, false);
+				/*
+				Vector3 Posy = Pos;
+				Posy += (0,0,Height/2);
+				Vector3 Vely = Vel;
+				Vel3DFromAngle(20, Angle, Max(-20, Pitch));
+				Posy += Vel;
+				Vel = Vely;
+				Actor a = Spawn("MR_uKickAttack", Posy);
+				a.Vel3DFromAngle(1, Angle, Max(-20, Pitch));
+				*/
+				Actor a = A_FireProjectileLZDoom("MR_uKickAttack");
+				a.Master = Self;
+				}
+        KIC2 G 1;
+		KIC2 H 1 A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, true);
+		KIC2 H 1 {
+			A_OverLay(-854, "WeaponFlash2");
+			player.fov = player.desiredfov * 0.965;
+			A_SetAngle(+1 + angle, SPF_INTERPOLATE);
+			}
+		KIC2 I 1 {
+			A_SetPitch(-0.5 + pitch, SPF_INTERPOLATE);
+			A_SetAngle(+1 + angle, SPF_INTERPOLATE);
+			A_SetRoll(roll+2);
+			player.fov = player.desiredfov * 0.970;
+		}
+		KIC2 J 1 {
+			A_SetPitch(-0.5 + pitch, SPF_INTERPOLATE);
+			A_SetRoll(roll+2);
+			A_SetAngle(+0.5 + angle, SPF_INTERPOLATE);
+			player.fov = player.desiredfov * 0.98;
+			}
+		KIC2 K 1 {
+			A_SetPitch(-0.5 + pitch, SPF_INTERPOLATE);
+			A_SetRoll(roll+2);
+			A_SetAngle(+0.5 + angle, SPF_INTERPOLATE);
+			player.fov = player.desiredfov * 0.99;
+		}
+		KIC2 L 1 {
+			A_SetAngle(+0.5 + angle, SPF_INTERPOLATE);
+			A_SetPitch(-0.5 + pitch, SPF_INTERPOLATE);
+			player.fov = player.desiredfov;
+			}
+		KIC2 A 1 {
+			invoker.Kickin=False;
+			A_SetAngle(-0.5 + angle, SPF_INTERPOLATE);
+			A_SetPitch(-1.25 + pitch, SPF_INTERPOLATE);
+		}
+		#### # 0 A_TakeInventory("MR_UKNoLegs", 2);
+		TNT1 A 0 {SetPlayerProperty(0,0,0);}
+		Stop;
+	
+	SlideKick:
+		#### # 0 A_GiveInventory("MR_UKNoLegs",2);
+		TNT1 A 0 A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, true);
+		SLDK A 1 {
+			if(Player.Cmd.ForwardMove==0 && Player.Cmd.SideMove==0)invoker.SlideAng = Angle;
+			else invoker.SlideAng=Angle-90+VectorAngle(Player.Cmd.SideMove, Player.Cmd.ForwardMove);
+			A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52);
+			A_SetPitch(Min(20, Pitch));
+			invoker.LeftKick = DeltaAngle(invoker.SlideAng, Angle)<0;
+			invoker.MRKick_GetWeapOfst();
+			invoker.KickHasHitObject=false; A_StartSound("MrSlideKick", 4);}
+		SLDK C 1 {player.fov = player.desiredfov * 0.85;
+			A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52);
+			A_SetPitch(Min(20, Pitch));}
+		SLDK D 1 {player.fov = player.desiredfov * 0.80;
+			A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52, WOF_INTERPOLATE);
+			A_SetPitch(Min(20, Pitch));}
+		SLDK E 1 {player.fov = player.desiredfov * 0.75;
+			A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52, WOF_INTERPOLATE);
+			A_SetPitch(Min(20, Pitch));}
+		SLDK FG 1 {A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52, WOF_INTERPOLATE);
+					A_SetPitch(Min(30, Pitch));}
+		NULL A 0 A_JumpIf(Height >= MR_uLegsToken(FindInventory("MR_uLegsToken")).MaxHeight * .75, "LowerKick");
+		TNT1 A 0 A_JumpIf(Invoker.KickHasHitObject, "LowerKick");
+		TNT1 A 0 A_StartSound("MrSlideLoop", 4, CHANF_LOOP, pitch:FRandom(.9, 1.1));
+		TNT1 A 0 {invoker.PlrZpos = pos.z+5;}
+	SlideLoop:
+		SLDK IJK 1{
+				if(Player.Cmd.ForwardMove!=0 || Player.Cmd.SideMove!=0)
+				{
+					Float DestAng = DeltaAngle(invoker.SlideAng, Angle-90+VectorAngle(Player.Cmd.SideMove, Player.Cmd.ForwardMove));
+					if(DestAng!=0)invoker.SlideAng+=DestAng/7;
+				}
+				if(invoker.Falling>2 && Pos.Z<invoker.PosZ && Pos.Z>FloorZ+20){A_OverLay(-853,"SlideFall");Return;}
+				if(Pos.Z>FloorZ+20 && Pos.Z<invoker.PosZ)invoker.Falling++;else invoker.Falling = 0;
+				Vel.XY += AngleToVector(invoker.SlideAng, 1) * 2;
+				A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52, WOF_INTERPOLATE);
+				A_SetPitch(Min(20, Pitch));
+				actor a=A_FireProjectileLZDoom("MR_uKickAttack", -Angle+invoker.SlideAng, 0, 0, FPF_AIMATANGLE, -Pitch);
+				 if(a){a.Master=Self;
+				 MR_uKickAttack(a).Slide=True;}
+				 else A_OverLay(-853,"LowerKick");
+			if (Height > MR_uLegsToken(FindInventory("MR_uLegsToken")).MaxHeight * .75||Invoker.KickHasHitObject||pos.z>invoker.PlrZpos) 
+			A_OverLay(-853,"LowerKick");
+		}
+		#### # 0 {invoker.PosZ = Pos.Z;}
+		SLDK LMN 1{
+				if(Player.Cmd.ForwardMove!=0 || Player.Cmd.SideMove!=0)
+				{
+					Float DestAng = DeltaAngle(invoker.SlideAng, Angle-90+VectorAngle(Player.Cmd.SideMove, Player.Cmd.ForwardMove));
+					if(DestAng!=0)invoker.SlideAng+=DestAng/7;
+				}
+				if(invoker.Falling>2 && Pos.Z<invoker.PosZ && Pos.Z>FloorZ+20){A_OverLay(-853,"SlideFall");Return;}
+				if(Pos.Z>FloorZ+20 && Pos.Z<invoker.PosZ)invoker.Falling++;else invoker.Falling = 0;
+				Vel.XY += AngleToVector(invoker.SlideAng, 1) * 2;
+				A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52, WOF_INTERPOLATE);
+				A_SetPitch(Min(20, Pitch));
+				actor a=A_FireProjectileLZDoom("MR_uKickAttack", -Angle+invoker.SlideAng, 0, 0, FPF_AIMATANGLE, -Pitch);
+				 if(a){a.Master=Self;
+				 MR_uKickAttack(a).Slide=True;}
+				 else A_OverLay(-853,"LowerKick");
+			if (Height > MR_uLegsToken(FindInventory("MR_uLegsToken")).MaxHeight * .75||Invoker.KickHasHitObject||pos.z>invoker.PlrZpos) 
+			A_OverLay(-853,"LowerKick");
+		}
+		TNT1 A 0 A_JumpIf(Pos.Z<invoker.PosZ-2, "SlideLoop");
+		#### # 0 {invoker.PosZ = Pos.Z;}
+		SLDK JKL 1{
+				if(Player.Cmd.ForwardMove!=0 || Player.Cmd.SideMove!=0)
+				{
+					Float DestAng = DeltaAngle(invoker.SlideAng, Angle-90+VectorAngle(Player.Cmd.SideMove, Player.Cmd.ForwardMove));
+					if(DestAng!=0)invoker.SlideAng+=DestAng/7;
+				}
+				if(invoker.Falling>2 && Pos.Z<invoker.PosZ && Pos.Z>FloorZ+20){A_OverLay(-853,"SlideFall");Return;}
+				if(Pos.Z>FloorZ+20 && Pos.Z<invoker.PosZ)invoker.Falling++;else invoker.Falling = 0;
+				Vel.XY += AngleToVector(invoker.SlideAng, 1) * 2;
+				A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52, WOF_INTERPOLATE);
+				A_SetPitch(Min(20, Pitch));
+				actor a=A_FireProjectileLZDoom("MR_uKickAttack", -Angle+invoker.SlideAng, 0, 0, FPF_AIMATANGLE, -Pitch);
+				 if(a){a.Master=Self;
+				 MR_uKickAttack(a).Slide=True;}
+				 else A_OverLay(-853,"LowerKick");
+			if (Height > MR_uLegsToken(FindInventory("MR_uLegsToken")).MaxHeight * .75||Invoker.KickHasHitObject||pos.z>invoker.PlrZpos) 
+			A_OverLay(-853,"LowerKick");
+		}
+		TNT1 A 0 A_JumpIf(Pos.Z<invoker.PosZ-2, "SlideLoop");
+		#### # 0 {invoker.PosZ = Pos.Z;}
+		SLDK MNJ 1{
+				if(Player.Cmd.ForwardMove!=0 || Player.Cmd.SideMove!=0)
+				{
+					Float DestAng = DeltaAngle(invoker.SlideAng, Angle-90+VectorAngle(Player.Cmd.SideMove, Player.Cmd.ForwardMove));
+					if(DestAng!=0)invoker.SlideAng+=DestAng/7;
+				}
+				if(invoker.Falling>2 && Pos.Z<invoker.PosZ && Pos.Z>FloorZ+20){A_OverLay(-853,"SlideFall");Return;}
+				if(Pos.Z>FloorZ+20 && Pos.Z<invoker.PosZ)invoker.Falling++;else invoker.Falling = 0;
+				Vel.XY += AngleToVector(invoker.SlideAng, 1) * 2;
+				A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52, WOF_INTERPOLATE);
+				A_SetPitch(Min(20, Pitch));
+				actor a=A_FireProjectileLZDoom("MR_uKickAttack", -Angle+invoker.SlideAng, 0, 0, FPF_AIMATANGLE, -Pitch);
+				 if(a){a.Master=Self;
+				 MR_uKickAttack(a).Slide=True;}
+				 else A_OverLay(-853,"LowerKick");
+			if (Height > MR_uLegsToken(FindInventory("MR_uLegsToken")).MaxHeight * .75||Invoker.KickHasHitObject||pos.z>invoker.PlrZpos) 
+			A_OverLay(-853,"LowerKick");
+		}
+		TNT1 A 0 A_JumpIf(Vel.Z<0, "SlideLoop");
+	LowerKick:
+		TNT1 A 0 {
+			player.fov = player.desiredfov;
+			A_StopSound(4);
+			A_StartSound("MrSlideEnd", 4, pitch:FRandom(.9, 1.1));
+			A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, true);
+			A_OverLay(-854, "WeaponFlash2");
+			A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52);
+		}
+		SLDK O 1 {A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52);
+					A_SetPitch(Min(20, Pitch));}
+		SLDK PQRSTU 1 {
+					invoker.SlideAng-=Player.Cmd.SideMove*.0005;
+					A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52, WOF_INTERPOLATE);
+					A_SetPitch(Min(20, Pitch));}
+		#### # 0 A_TakeInventory("MR_UKNoLegs", 2);
+		TNT1 A 0 {
+			invoker.Kickin=False;
+			A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, false);
+		}
+		Stop;
+	SlideFall:
+		TNT1 A 0 {
+			invoker.Falling = 0;
+			player.fov = player.desiredfov;
+			A_StopSound(4);
+			A_StartSound("MrSlideEnd", 4, pitch:FRandom(.9, 1.1));
+			A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, true);
+			A_OverLay(-854, "WeaponFlash2");
+			A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52);
+		}
+		SLDK O 2 {A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52);
+					A_SetPitch(Min(20, Pitch));}
+		SLDK GFEDCBAA 1{
+					invoker.SlideAng-=Player.Cmd.SideMove*.0005;
+					A_OverlayOffset(-853, -DeltaAngle(Angle, invoker.SlideAng) *2, -Min(20, Pitch *2) + 52, WOF_INTERPOLATE);
+					A_SetPitch(Min(20, Pitch-4));}
+		#### # 0 A_TakeInventory("MR_UKNoLegs", 2);
+		TNT1 A 0 {
+			invoker.Kickin=False;
+			A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, false);
+		}
+		Stop;
+		
+	AirKick:
+		#### # 0 {A_TakeInventory("MR_UKNoLegs", 2);A_GiveInventory("MR_UKNoLegs",2);}
+		TNT1 A 0 {
+			A_OverlayOffset(-853, 0, 32);A_OverlayScale(-853, 1, 0);
+			A_StartSound("MrKickSwing", CHAN_Auto, pitch:FRandom(.87,.94));
+			A_Recoil (-6);
+			//A_ZoomFactor(0.95);
+			player.fov = player.desiredfov * 0.95;
+			A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, true);
+			invoker.MRKick_GetWeapOfst();
+		}
+		AKCK A 1 A_SetRoll(roll-2, SPF_INTERPOLATE);
+		AKCK B 1 A_SetRoll(roll-2, SPF_INTERPOLATE);
+		AKCK C 1 A_SetRoll(roll-2, SPF_INTERPOLATE);
+		AKCK DEFGH 1;
+        RIFF A 0 {
+				actor a=A_FireProjectile("MR_uKickAttack");
+				 if(a){a.Master=Self;
+				 MR_uKickAttack(a).Air=True;}
+		}
+		TNT1 A 0 {player.fov = player.desiredfov * 0.975;}//A_ZoomFactor(0.975);
+        AKCK IJK 1;
+		TNT1 A 0 {player.fov = player.desiredfov * 0.995;}//A_ZoomFactor(0.995);
+		AKCK LM 1;
+		AKCK N 1 A_SetRoll(roll+2, SPF_INTERPOLATE);
+		AKCK O 1 A_SetRoll(roll+2, SPF_INTERPOLATE);
+		TNT1 A 1 A_SetRoll(roll+2, SPF_INTERPOLATE);
+		#### # 0 A_TakeInventory("MR_UKNoLegs", 2);
+		TNT1 A 0 {
+			invoker.Kickin=False;
+			player.fov = player.desiredfov;//A_ZoomFactor(1.0);
+			A_OverlayFlags(-853,PSPF_PLAYERTRANSLATED, false);
+		}
+		Stop;
+		}
+}
+
+Class MR_uKickStunToken : CustomInventory
+{
+	Default
+	{
+		Inventory.MaxAmount 1;
+		+INVENTORY.UNDROPPABLE
+		+INVENTORY.UNTOSSABLE
+		+INVENTORY.AUTOACTIVATE
+	}
+	States
+	{
+	Use:
+		TNT1 A 2;
+		TNT1 A 0 {if(Invoker.Owner&&FindState("Pain")&&Health>1)
+			{SetStateLabel("Pain");Invoker.A_SetTics(10);}}
+		TNT1 AA 1 {if(Health>0&&Tics>-1)A_SetTics(30);}
+		TNT1 A 0 {Invoker.Destroy();}
+		Stop;
+	Pickup:
+		TNT1 A 0
+		{
+			return true;
+		}
+		Stop;
+	}
+}
+
+Class MR_uKickAttack: FastProjectile
+{
+	Bool Slide, Air;
+	Default{
+	Radius 6;
+	Height 6;
+	DamageType "Kick";
+	Projectile; 
+	+NOEXTREMEDEATH
+    Damage 6;
+    Speed 30;
+	SeeSound "none";
+	DeathSound "none";
+	Decal "none";}
+	
+	Override Void PostBeginPlay()
+	{
+		Super.PostBeginPlay();
+		if(Slide)SetDamage(2);
+		if(Air)SetDamage(9);
+	}
+	
+	override int SpecialMissileHit(Actor victim)
+	{
+		if (victim && (!target || victim != target) && victim.bSHOOTABLE && !victim.bDONTTHRUST)
+		{
+			if((Victim.Health-Slide?3:6)>0 && Target && Target.Player){victim.vel.xy = AngleToVector(Target.Angle, Air?7:6);
+			victim.vel.z += 3;
+			if(Victim.Health>0 && !Victim.FindState("Pain.Kick", True)/* && Victim.Default.Health < 200*/)Victim.A_GiveInventory("MR_KickDamageDealer");
+			}
+		}
+		return -1;
+	}
+	
+	States
+	{
+	Spawn:
+		TNT1 A 0;
+		TNT1 A 1{
+			if(Slide&&Master&&Master.vel.xy.Length()>1){
+			Int Cwar = CVar.GetCVar("MR_UKickSlide", Players[ConsolePlayer]).GetInt();
+			if(Cwar==1||Cwar>2)For(int i=0;i<7;i+=Random(1,2)){int Rand=Random(60, 120);
+			A_SpawnParticle(Color(int(Rand*FRandom(1, 1.2)), int(Rand*FRandom(1,1.2)), Rand), SPF_NOTIMEFREEZE|SPF_RELVEL|SPF_RELPOS, 140, Random(14, 18), VectorAngle(Vel.X, Vel.Y)+Random(-80, 80),
+			-30,0,-4, VelX:-FRandom(.6, 2), 0, FRandom(.3, 1), 0,0, -FRandom(.001, .009), .2, FRandom(.006, .015), FRandom(2, 3));}
+			if(Cwar>1)For(int i=0;i<7;i+=Random(1,2)){int Rand=Random(70, 140);
+			A_SpawnParticle(Color(int(Rand*FRandom(1, 1.3)), int(Rand*FRandom(1, 1.3)), Rand), SPF_NOTIMEFREEZE|SPF_RELVEL|SPF_RELPOS, 230, FRandom(.4, 2), VectorAngle(Vel.X, Vel.Y)+Random(-60, 60),
+			-35,0,-7, VelX:-FRandom(.6, 2), Random(-1, 1), FRandom(2, 5), 0,0, -FRandom(.2, .4), 1, -1, -FRandom(.01, .02));}}}
+        TNT1 A 1;
+		Stop;
+	Death:
+		TNT1 A 0;
+		TNT1 A 0 {if(Target && Target.Player && CVar.GetCVar("MR_UKickUse", Target.player).GetBool())
+				 {
+					Master = Target;
+					FLineTraceData RemoteRay;
+					bool hit = LineTrace(Master.angle, Master.Radius * 3, Master.pitch, TRF_THRUACTORS, data: RemoteRay);
+					if (hit && RemoteRay.HitType == TRACE_HitWall)
+					{
+						RemoteRay.HitLine.Activate(Master, 0, SPAC_Use);
+					}
+				 }}
+		TNT1 A 0 A_CheckFloor("DeathOnGround");
+		TNT1 A 0 A_StartSound("MrKickHitWall", CHAN_Auto, pitch:FRandom(.85, 1.15));
+		TNT1 A 0 A_JumpIf(Slide, "Slide");
+		TNT1 A 0 {For(int i=0;i<10;i+=Random(1,2)){int Rand = Random(130, 170);
+				A_SpawnParticle(Color(Rand,Rand,Rand), SPF_RELVEL|SPF_RELPOS, 70, FRandom(19, 22), Master?AngleTo(Master):0, 0,FRandom(-7,7),FRandom(-6,6),
+				VelX:FRandom(.01, .6),FRandom(-.2, .2),FRandom(0, .3), 0,0,-FRandom(0, .05), .2, FRandom(.01, .02), FRandom(2, 3));}}
+		TNT1 A 0 {if(Master&&Master.FindInventory("Mr_uKickToken")){Master.A_Recoil(3);
+				Mr_uKickToken(Master.FindInventory("Mr_uKickToken")).KickHasHitObject=True;}}
+		TNT1 A 0 Radius_Quake (2, 6, 0, 5, 0);
+		TNT1 A 10;
+		Stop;
+	Slide:
+		TNT1 A 0 A_CheckFloor(2);
+		TNT1 A 0 A_StartSound("MrKickHitWall", CHAN_Auto, pitch:FRandom(.9, 1.1));
+		TNT1 A 0 {For(int i=0;i<10;i+=Random(1,2)){int Rand = Random(130, 170);
+				A_SpawnParticle(Color(Rand,Rand,Rand), SPF_RELVEL|SPF_RELPOS, 70, FRandom(19, 22), Master?AngleTo(Master):0, 0,FRandom(-7,7),FRandom(-6,6),
+				VelX:FRandom(-.2, .2),FRandom(-.2, .2),FRandom(.01, .6), 0,0,-FRandom(0, .02), .2, FRandom(.01, .02), FRandom(2, 3));}}
+		TNT1 A 0 Radius_Quake (2, 6, 0, 5, 0);
+		TNT1 A 0 {if(Master&&Master.FindInventory("Mr_uKickToken")){Master.A_Recoil(1);
+				Mr_uKickToken(Master.FindInventory("Mr_uKickToken")).KickHasHitObject=True;}}
+		TNT1 A 10;
+		Stop;
+		
+	XDeath:
+		TNT1 A 0 A_StartSound("MrKickPunch", CHAN_Auto, pitch:FRandom(.9, 1.1));
+		TNT1 A 0 A_JumpIf(Slide, "SlideXDeath");
+		TNT1 A 0 Radius_Quake (2, 6, 0, 5, 0);
+		TNT1 A 10;
+		Stop;
+	SlideXDeath:
+		TNT1 A 0 Radius_Quake (2, 6, 0, 5, 0);
+		TNT1 A 0 {if(Master&&Master.FindInventory("Mr_uKickToken"))
+				Mr_uKickToken(Master.FindInventory("Mr_uKickToken")).KickHasHitObject=True;}
+		TNT1 A 10;
+		Stop;
+			
+		
+	DeathOnGround:
+		TNT1 A 0;
+		TNT1 A 0 A_StartSound("MrKickHitWall", CHAN_Auto, pitch:FRandom(.8, 1.05));
+		TNT1 A 0 {For(int i=0;i<10;i+=Random(1,2)){int Rand = Random(130, 170);
+				A_SpawnParticle(Color(Rand,Rand,Rand), SPF_RELVEL|SPF_RELPOS, 70, FRandom(19, 22), Master?AngleTo(Master):0, 0,FRandom(-7,7),FRandom(-6,6),
+				VelX:FRandom(-.2, .2),FRandom(-.2, .2),FRandom(.4, 1.4), 0,0,-FRandom(0, .02), .2, FRandom(.01, .02), FRandom(2, 3));}}
+		TNT1 A 0 Radius_Quake (2, 6, 0, 5, 0);
+		TNT1 A 0 A_Explode(10, 40, 0);
+		TNT1 AA 5;
+		Stop;
+	}
+}
+
+Class MR_KickDamageDealer : CustomInventory
+{
+	int MobTics;
+	Default{Inventory.MaxAmount 1;+INVENTORY.UNDROPPABLE+INVENTORY.UNTOSSABLE+INVENTORY.AUTOACTIVATE}
+	States{Use:TNT1 A 0;Fail;Pickup:TNT1 A 0{return true;}Stop;}
+	
+	Override Void DoEffect()
+	{
+		if(Owner.Health>0)
+		{
+			if(GetAge()<2){if(Owner.FindState("Pain"))Owner.SetStateLabel("Pain");}
+			else if(GetAge()<20){if(!MobTics)MobTics=Owner.Tics;Owner.Tics=-1;}
+			
+			else {Owner.Tics = MobTics;Destroy();}
+		}
+		else Destroy();
+		Super.DoEffect();
+	}
+}
