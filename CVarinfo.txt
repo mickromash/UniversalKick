@@ -1,6 +1,7 @@
 server noarchive bool MRKick_Debug = false;
 user bool MR_UKickFPLegs = True;
 user bool MR_UKickLedge = True;
+user bool MR_UKickOneHand = true;
 user int MR_UKickVanila = 0;//Gloves sprites 0 - Brutal, 1 - Classic, -1 - Black, 3 - Doom 2016
 user string MR_UKickVoice = "BrutalDefault";
 user bool MR_UKickHDestVoice = False;

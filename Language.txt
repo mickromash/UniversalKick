@@ -6,6 +6,7 @@ MR_UKICKACTIVE = "Kick activates switches";
 MRUKICKFUKKEY = "Taunt";
 MR_UKICKFPSLEGSOPT = "Show first person legs";
 MR_UKICKLEDGE = "Ledge climbing";
+MR_UKickOneHand = "Grabbing ledge with one hand";
 
 MR_UKICKSPRITES = "Gloves";
 MR_UKICKBRUTAL = "\cmBrut\coal";
@@ -36,6 +37,8 @@ MR_UKICKACTIVE = "Пинок активирует кнопки";
 MRUKICKFUKKEY = "Показать фак";
 MR_UKICKFPSLEGSOPT = "Показывать ноги от первого лица";
 MR_UKICKLEDGE = "Хвататься за уступы";
+MR_UKickOneHand = "Хвататься одной рукой";
+
 MR_UKICKSPRITES = "Перчатки";
 MR_UKICKBRUTAL = "\cmБруталь\coные";
 MR_UKICKBLACK = "\cmЧёрные";
