@@ -111,7 +111,7 @@ Class Mr_uLedgeToken : CustomInventory
 			if(MRKick_Debug)Console.Printf("Got sector");
 			
 			//Check if the candidate ledge can suffice
-			if(i>0 && LedgeCandidate <= Owner.Pos.Z + Owner.Height * 1.2f){LedgeHeightR = LedgeCandidate;}//Hand[1]=True;}
+			if(i>0 && LedgeCandidate <= Owner.Pos.Z + Owner.Height * 1.2f){LedgeHeightR = LedgeCandidate;}
 			
 			if(LedgeCandidate > Owner.Pos.Z + Owner.Height * 0.5 && LedgeCandidate <= Owner.Pos.Z + Owner.Height * 1.2f)
 			{
@@ -119,14 +119,16 @@ Class Mr_uLedgeToken : CustomInventory
 				LedgeAngle = Ang;
 				Vector3 OrigPos = Owner.Pos;
 				Owner.SetXYZ((Pos.XY, LedgeCandidate));
-				if(/*!Owner.CheckMove(Owner.Pos.XY + 5.f * AngleToVector(Owner.Angle)) || */LedgeCeil<LedgeCandidate + Owner.Height || Owner.CeilingZ < LedgeCandidate + Owner.Height) //not enough space, cancel everything :(
+				Double CrouchHeight = PlayerPawn(Owner).FullHeight*.5;
+				
+				if(LedgeCeil<LedgeCandidate + CrouchHeight || Owner.CeilingZ < LedgeCandidate + CrouchHeight)//not enough space
 				{
 					if(MRKick_Debug)Console.Printf("Not enough space");
 					Owner.SetXYZ(OrigPos);
 					Continue;
 				}
 				Owner.SetXYZ(OrigPos);
-				
+
 				LedgeHeight = LedgeCandidate;
 				LedgeHeightMin = (LedgeHeight - Height * 0.97f);
 				LedgeHeightMax = (LedgeHeight - Height * 0.751f);
