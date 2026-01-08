@@ -85,6 +85,7 @@ Class MR_uKickToken : CustomInventory
 	
 	Void MRKick_GetWeapOfst()
 	{
+		if(!Owner.Player.FindPSprite(PSP_WEAPON))Return;
 		if(Ofst!=(0, 0))
 		{
 			Ofst = (0, 0);
