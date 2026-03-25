@@ -45,6 +45,7 @@ Class Mr_uLedgeToken : CustomInventory
 	void LedgeGrabInitiator()
 	{
 		PlayerInfo ZMPlayer = Owner.player;
+		if(!ZMPlayer.ReadyWeapon||!ZMPlayer.FindPSprite(PSP_WEAPON))Return;
 		if(!ZMPlayer){Console.Printf("No Player");Console.Printf(Self.GetClassName());Return;}
 		
 		//Already ledge grabbing, no clipping, moving away from where you are looking, ceiling already too low for sure

@@ -19,6 +19,7 @@ OptionMenu "MR_UKickOptions"
 	Control "$MRUKICKFUKKEY", mr_fuk
 	StaticText ""
 	Option "$MR_UKICKACTIVE", "MR_UKickUse", "YesNo"
+	Slider "$MR_UKickDamageMult", "MR_UKickDamageMult", .1, 5, .1, 2
 	Option "$MR_UKICKSLIDEPARTS", "MR_UKickSlide", "MR_UKickSlideValue"
 	Option "$MR_UKICKFPSLEGSOPT", "MR_UKickFPLegs", "YesNo"
 	Option "$MR_UKICKLEDGE", "MR_UKickLedge", "YesNo"

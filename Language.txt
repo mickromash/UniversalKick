@@ -2,6 +2,7 @@
 
 MRUKICKKEYS = "Universal Kick";
 MRUKICKKEY = "Kick";
+MR_UKickDamageMult = "Kick damage multiply";
 MR_UKICKACTIVE = "Kick activates switches";
 MRUKICKFUKKEY = "Taunt";
 MR_UKICKFPSLEGSOPT = "Show first person legs";
@@ -33,6 +34,7 @@ MR_uKickGive = "Some part of the mod doesn't work";
 
 MRUKICKKEYS = "Универсальный пинок";
 MRUKICKKEY = "Пнуть";
+MR_UKickDamageMult = "Множитель урона пинка";
 MR_UKICKACTIVE = "Пинок активирует кнопки";
 MRUKICKFUKKEY = "Показать фак";
 MR_UKICKFPSLEGSOPT = "Показывать ноги от первого лица";

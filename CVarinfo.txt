@@ -6,4 +6,5 @@ user int MR_UKickVanila = 0;//Gloves sprites 0 - Brutal, 1 - Classic, -1 - Black
 user string MR_UKickVoice = "BrutalDefault";
 user bool MR_UKickHDestVoice = False;
 user bool MR_UKickUse = true;//Kicking activates doors and switches
-user int MR_UKickSlide = 3;//Effects when sliding 0 - None, 1 - Dust mist, 2 - Dist particles, 3 - Both
+nosave int MR_UKickSlide = 3;//Effects when sliding 0 - None, 1 - Dust mist, 2 - Dist particles, 3 - Both
+server float MR_UKickDamageMult = 1;
