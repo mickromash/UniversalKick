@@ -29,6 +29,7 @@ Class Mr_uLedgeToken : CustomInventory
 				if(LedgeGrabbed)LedgeGrab();
 				if(LedgeCeiling-LedgeHeight<Owner.Height){
 					owner.player.crouching = -1;
+					owner.player.cmd.buttons |= BT_CROUCH;
 					LowCeiling = true;
 				}
 			}
@@ -37,7 +38,14 @@ Class Mr_uLedgeToken : CustomInventory
 				Owner.Player.GetPSprite(PSP_WEAPON).X = Hands[0]? WepOfst.X+50:WepOfst.X-50;
 				Owner.Player.GetPSprite(PSP_WEAPON).Y = WepOfst.Y+30;
 			}
-			else if(LowCeiling && !(owner.player.cmd.buttons & BT_CROUCH) && (Owner.FloorZ==LedgeHeight || Owner.Pos.Z<LedgeHeight-5 || Owner.Vel.Z==0)){LowCeiling = false;owner.player.crouching = 0;}
+			else if(LowCeiling && owner.Pos.Z + owner.Height < Owner.ceilingZ - Owner.FloorZ&&
+				!(owner.player.cmd.buttons & BT_CROUCH) && 
+				(Owner.FloorZ==LedgeHeight || Owner.Pos.Z<LedgeHeight-5 || Owner.Vel.Z==0)
+			){
+				LowCeiling = false;
+				owner.player.crouching = 0;
+				//Console.Printf("UnCrouch");
+			}
 			if(GetAge()%350==0)Owner.UseInventory(Self);
 
 		}
